@@ -35,7 +35,7 @@ def is_username_exits(username, conn = None, database = "database.db"):
     return False
 
 def add_user_to_db(username, password, api_key, conn = None, database = "database.db"):
-    query = "INSERT INTO users(username, password, api_key) VALUES(?,?,?);"
+    query = "INSERT INTO users(username, password, api_key, 0) VALUES(?,?,?);"
 
     if(not conn):
         conn = sqlite3.connect(database)
@@ -105,10 +105,44 @@ def api_key_generator():
     return 100000
 
 
+# api usage count
+# digerlerini de boyle yap
+def increase_api_usage(api_key, conn = None, database = "database.db"):
+    query = "UPDATE users SET api_usage = api_usage + 1 WHERE api_key = ?;"
+
+    if(conn):
+        cursor = conn.cursor()   
+        cursor.execute(query,(api_key,))
+        conn.commit()
+    else:
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()   
+        cursor.execute(query,(api_key,))
+        conn.commit()
+        conn.close()
+    
+def get_api_usage(api_key, conn = None, database = "database.db"):
+    query = "SELECT api_usage FROM users WHERE api_key = ?;"
+
+    if(conn):
+        cursor = conn.cursor()   
+        cursor.execute(query,(api_key,))
+        usage = cursor.fetchall()
+    else:
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()   
+        cursor.execute(query,(api_key,))
+        usage = cursor.fetchall()
+        conn.close()
+    return usage[0][0]
+
+
 # api stuff
-def run_api(info):
+def run_api(key, info):
     # TODO
-    return {info:1,"hi":2}
+    increase_api_usage(str(key))
+    usage = get_api_usage(str(key))
+    return {info:1,"hi":2,"usage":usage}
 
 
 
@@ -176,7 +210,7 @@ def api():
         info = query_parameters.get('info')
         print(info, file=sys.stdout)
 
-        api_out = run_api(info)
+        api_out = run_api(key, info)
         return api_out
     else:
         return {"status":0}
