@@ -35,7 +35,7 @@ def is_username_exits(username, conn = None, database = "database.db"):
     return False
 
 def add_user_to_db(username, password, api_key, conn = None, database = "database.db"):
-    query = "INSERT INTO users(username, password, api_key, 0) VALUES(?,?,?);"
+    query = "INSERT INTO users(username, password, api_key, api_usage) VALUES(?,?,?,0);"
 
     if(not conn):
         conn = sqlite3.connect(database)
@@ -100,9 +100,11 @@ def is_api_key_valid(key_to_try):
             return True
     return False
 
-def api_key_generator():
-    # TODO
-    return 100000
+def api_key_generator(username, rand_len=5):
+    import random
+    import string
+    key = username + ''.join(random.choices(string.ascii_uppercase + string.digits, k=rand_len))
+    return key
 
 
 # api usage count
@@ -137,12 +139,53 @@ def get_api_usage(api_key, conn = None, database = "database.db"):
     return usage[0][0]
 
 
-# api stuff
-def run_api(key, info):
-    # TODO
-    increase_api_usage(str(key))
-    usage = get_api_usage(str(key))
-    return {info:1,"hi":2,"usage":usage}
+# # api stuff
+# def run_api(key, info = ""):
+#     increase_api_usage(str(key))
+#     usage = get_api_usage(str(key))
+
+#     # ------test
+#     from test_usage import get_doom_days
+#     doom = get_doom_days()
+#     # ------- 
+
+#     api_out = {info:1, "doom":doom , "usage":usage, "status":0}
+#     return api_out
+
+
+def run_api(func): 
+    def function(key, *args, **kwargs): 
+
+        if(is_api_key_valid(key)):
+            # increase usage
+            increase_api_usage(str(key))
+            usage = get_api_usage(str(key))
+            
+            returned_value = func(key, *args, **kwargs)
+
+            # add usage and status to returned value
+            returned_value.update({"usage":usage})
+            returned_value.update({"status":1})
+            returned_value.update({"key":1})
+            
+        else:
+            returned_value = {"status":1, "key":0}
+
+        return returned_value           
+    return function 
+
+
+
+
+
+
+@run_api
+def test_api(key, info = ""):
+    from test_usage import get_doom_days
+    doom = get_doom_days()
+
+    api_out = {info:1, "doom":doom}
+    return api_out
 
 
 
@@ -173,7 +216,7 @@ def register():
             form.username.errors.append("username exists")
             return render_template("register.html", form = form)
         else:
-            api_key = api_key_generator()
+            api_key = api_key_generator(username)
             add_user_to_db(username,password,api_key)
 
         return redirect(url_for("login"))
@@ -204,17 +247,12 @@ def login():
 @app.route('/api', methods=['GET'])
 def api():
     query_parameters = request.args
-    key = int(query_parameters.get('key'))
+    key = query_parameters.get('key')
+    # info = query_parameters.get('info')
     
-    if(is_api_key_valid(key)):
-        info = query_parameters.get('info')
-        print(info, file=sys.stdout)
+    api_out = test_api(key)
 
-        api_out = run_api(key, info)
-        return api_out
-    else:
-        return {"status":0}
-
+    return api_out
 
 
 app.run()
