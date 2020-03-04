@@ -46,8 +46,18 @@ def add_user_to_db(username, password, api_key, conn = None, database = "databas
     conn.close()
 
 def remove_user_from_db(username, conn = None, database = "database.db"):
-    # TODO
-    pass
+    query = "DELETE FROM users WHERE username = ?;"
+
+    if(conn):
+        cursor = conn.cursor()   
+        cursor.execute(query,(username,))
+        conn.commit()
+    else:
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()   
+        cursor.execute(query,(username,))
+        conn.commit()
+        conn.close()
 
 def validate_user(username, password, conn = None, database = "database.db"):
     query = "SELECT * FROM users WHERE username = ?;"
@@ -243,6 +253,24 @@ def login():
     else:
         return render_template("login.html", form = form)
 
+@app.route("/delete_account",methods = ["GET", "POST"])
+def delete_account():
+    #create the form
+    form = LoginForm(request.form)
+
+    if(request.method == "POST"):
+        #get form data from form
+        username = form.username.data
+        password = form.password.data
+
+        if(validate_user(username, password)):
+
+            remove_user_from_db(username)
+            return "user {0} deleted ..I hope".format(username)
+        else:
+            return redirect(url_for("delete_account"))
+    else:
+        return render_template("delete_account.html", form = form)
 
 @app.route('/api', methods=['GET'])
 def api():
